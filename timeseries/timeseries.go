@@ -7,6 +7,23 @@ import (
 	"strings"
 )
 
+// The SQL statement to create the correct loglines table
+const CreateLogLinesTableStmt = `
+CREATE TABLE loglines (
+  id integer primary key autoincrement,
+  remote_host varchar(255),
+  user varchar(255),
+  authuser varchar(255),
+  timestamp integer,
+  request_method varchar(255),
+  request_section varchar(255),
+  request_path varchar(255),
+  response_status integer,
+  response_bytes integer,
+  log_file varchar(255)
+)
+`
+
 type LogLine struct {
 	Host          string
 	User          string

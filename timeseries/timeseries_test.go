@@ -10,21 +10,6 @@ import (
 )
 
 const logFile = "TestLogFile"
-const createLoglinesTableStmt = `
-CREATE TABLE loglines (
-  id integer primary key autoincrement,
-  remote_host varchar(255),
-  user varchar(255),
-  authuser varchar(255),
-  timestamp integer,
-  request_method varchar(255),
-  request_section varchar(255),
-  request_path varchar(255),
-  response_status integer,
-  response_bytes integer,
-  log_file varchar(255)
-)
-`
 
 type logLineRow struct {
 	Id        int
@@ -51,7 +36,7 @@ func loadDB() (db *sql.DB, err error) {
 	if err != nil {
 		return
 	}
-	_, err = db.Exec(createLoglinesTableStmt)
+	_, err = db.Exec(CreateLogLinesTableStmt)
 	if err != nil {
 		return
 	}
