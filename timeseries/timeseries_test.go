@@ -155,62 +155,214 @@ func TestRecord(t *testing.T)  {
 }
 
 func TestMostCommonStatus(t *testing.T) {
-	db, err := loadDB()
-	if err != nil {
-		t.Error(err)
+	testCases := []struct{
+		inputLines []LogLine
+		expectedStatus uint16
+		start time.Time
+		end time.Time
+	}{
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			200,
+			parseTime("09/May/2018:15:00:39 +0000"),
+			parseTime("09/May/2018:19:00:39 +0000"),
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:19:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+			},
+			200,
+			parseTime("09/May/2018:15:00:39 +0000"),
+			parseTime("09/May/2018:20:00:39 +0000"),
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:19:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+			},
+			500,
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:20:00:39 +0000"),
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:19:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+			},
+			200,
+			parseTime("09/May/2018:15:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+		},
 	}
-	defer db.Close()
-	ts := LogTimeSeries{db, logFile}
-	logLine1 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine2 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:17:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	logLine3 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:18:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	_, err = ts.Record(logLine1)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine2)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine3)
-	if err != nil {
-		t.Error(err)
-	}
-	start := parseTime("09/May/2018:15:00:39 +0000")
-	end := parseTime("09/May/2018:19:00:39 +0000")
-	mostCommon, err := ts.MostCommonStatus(start, end)
-	if err != nil {
-		t.Error(err)
-	}
-	if mostCommon != 200 {
-		t.Errorf("Expected 200, got %v", mostCommon)
+	for caseIdx, testCase := range testCases {
+		func() {
+			db, err := loadDB()
+			if err != nil {
+				t.Error(err)
+			}
+			defer db.Close()
+			ts := LogTimeSeries{db, logFile}
+			for _, logLine := range testCase.inputLines {
+				_, err := ts.Record(logLine)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			actualStatus, err := ts.MostCommonStatus(testCase.start, testCase.end)
+			if err != nil {
+				t.Error(err)
+			}
+			if actualStatus != testCase.expectedStatus {
+				t.Errorf("Error on case %d.\nExpected: %#v\nActual:%#v\n",
+					caseIdx, testCase.expectedStatus, actualStatus)
+			}
+		}()
 	}
 }
 
@@ -229,290 +381,123 @@ func TestItHandlesMostCommonStatusForEmptyDb(t *testing.T) {
 	}
 }
 
-func TestMostCommonStatusEqualCounts(t *testing.T) {
-	db, err := loadDB()
-	if err != nil {
-		t.Error(err)
-	}
-	defer db.Close()
-	ts := LogTimeSeries{db, logFile}
-	logLine1 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine2 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:17:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	logLine3 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:18:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine4 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:19:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	_, err = ts.Record(logLine1)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine2)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine3)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine4)
-	if err != nil {
-		t.Error(err)
-	}
-	start := parseTime("09/May/2018:15:00:39 +0000")
-	end := parseTime("09/May/2018:20:00:39 +0000")
-	mostCommon, err := ts.MostCommonStatus(start, end)
-	if err != nil {
-		t.Error(err)
-	}
-	// 200 went in first, so that should come out first
-	if mostCommon != 200 {
-		t.Errorf("Expected 200, got %v", mostCommon)
-	}
-}
-
-func TestItIgnoresStatusesBeforeTimeRange(t *testing.T) {
-	db, err := loadDB()
-	if err != nil {
-		t.Error(err)
-	}
-	defer db.Close()
-	ts := LogTimeSeries{db, logFile}
-	logLine1 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine2 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:17:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	logLine3 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:18:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine4 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:19:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	_, err = ts.Record(logLine1)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine2)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine3)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine4)
-	if err != nil {
-		t.Error(err)
-	}
-	start := parseTime("09/May/2018:17:00:00 +0000")
-	end := parseTime("09/May/2018:20:00:39 +0000")
-	mostCommon, err := ts.MostCommonStatus(start, end)
-	if err != nil {
-		t.Error(err)
-	}
-	if mostCommon != 500 {
-		t.Errorf("Expected 200, got %v", mostCommon)
-	}
-}
-
-func TestItIgnoresStatusesAfterTimeRange(t *testing.T) {
-	db, err := loadDB()
-	if err != nil {
-		t.Error(err)
-	}
-	defer db.Close()
-	ts := LogTimeSeries{db, logFile}
-	logLine1 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine2 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:17:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	logLine3 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:18:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine4 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:19:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	_, err = ts.Record(logLine1)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine2)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine3)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine4)
-	if err != nil {
-		t.Error(err)
-	}
-	start := parseTime("09/May/2018:15:00:00 +0000")
-	end := parseTime("09/May/2018:19:00:00 +0000")
-	mostCommon, err := ts.MostCommonStatus(start, end)
-	if err != nil {
-		t.Error(err)
-	}
-	if mostCommon != 200 {
-		t.Errorf("Expected 200, got %v", mostCommon)
-	}
-}
-
 func TestGetStatusCounts(t *testing.T) {
-	db, err := loadDB()
-	if err != nil {
-		t.Error(err)
+	testCases := []struct{
+		inputLines []LogLine
+		expectedCounts []statusCount
+		start time.Time
+		end time.Time
+	}{
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			[]statusCount{
+				{200, 2},
+				{500, 1},
+			},
+			parseTime("09/May/2018:15:00:39 +0000"),
+			parseTime("09/May/2018:19:00:39 +0000"),
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/report",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			[]statusCount{
+				{200, 1},
+				{500, 1},
+			},
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+		},
+		{
+			[]LogLine{},
+			nil,
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+		},
 	}
-	defer db.Close()
-	ts := LogTimeSeries{db, logFile}
-	logLine1 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	logLine2 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:17:00:39 +0000"),
-		"GET",
-		"/report",
-		500,
-		123,
-	}
-	logLine3 := LogLine{
-		"127.0.0.1",
-		"-",
-		"james",
-		parseTime("09/May/2018:18:00:39 +0000"),
-		"GET",
-		"/report",
-		200,
-		123,
-	}
-	_, err = ts.Record(logLine1)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine2)
-	if err != nil {
-		t.Error(err)
-	}
-	_, err = ts.Record(logLine3)
-	if err != nil {
-		t.Error(err)
-	}
-	start := parseTime("09/May/2018:15:00:39 +0000")
-	end := parseTime("09/May/2018:19:00:39 +0000")
-	counts, err := ts.GetStatusCounts(start, end)
-	if err != nil {
-		t.Error(err)
-	}
-	expected := []statusCount{
-		statusCount{200, 2},
-		statusCount{500, 1},
-	}
-	if !cmp.Equal(counts, expected) {
-		t.Errorf("Expected: %#v\nActual: %#v\n", expected, counts)
+	for caseIdx, testCase := range testCases {
+		func() {
+			db, err := loadDB()
+			if err != nil {
+				t.Error(err)
+			}
+			defer db.Close()
+			ts := LogTimeSeries{db, logFile}
+			for _, logLine := range testCase.inputLines {
+				_, err = ts.Record(logLine)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			actualCounts, err := ts.GetStatusCounts(testCase.start, testCase.end)
+			if err != nil {
+				t.Error(err)
+			}
+			if !cmp.Equal(testCase.expectedCounts, actualCounts) {
+				t.Errorf("Error on case %d.\nExpected: %#v\nActual: %#v\n",
+					caseIdx, testCase.expectedCounts, actualCounts)
+			}
+		}()
 	}
 }
 
@@ -616,6 +601,141 @@ func TestMostRequestedSection(t *testing.T) {
 			if section != testCase.expectedSection {
 				t.Errorf("Error on case %d.\nExpected: %#v\nActual: %#v\n",
 					caseIdx, testCase.expectedSection, section)
+			}
+		}()
+	}
+}
+
+func TestMostRequestSectionEmptyDb(t *testing.T) {
+	db, err := loadDB()
+	if err != nil {
+		t.Error(err)
+	}
+	defer db.Close()
+	ts := LogTimeSeries{db, logFile}
+	start := parseTime("09/May/2018:15:00:00 +0000")
+	end := parseTime("09/May/2018:16:00:40 +0000")
+	_, err = ts.MostRequestedSection(start, end)
+	if err != sql.ErrNoRows {
+		t.Fail()
+	}
+}
+
+func TestGetSectionCounts(t *testing.T) {
+	testCases := []struct{
+		inputLines []LogLine
+		expectedCounts []sectionCount
+		start time.Time
+		end time.Time
+	}{
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			[]sectionCount {
+				{"report", 2},
+				{"api", 1},
+			},
+			parseTime("09/May/2018:15:00:39 +0000"),
+			parseTime("09/May/2018:19:00:39 +0000"),
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			[]sectionCount {
+				{"api", 1},
+				{"report", 1},
+			},
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+		},
+		{
+			[]LogLine{},
+			nil,
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+		},
+	}
+	for caseIdx, testCase := range testCases {
+		func() {
+			db, err := loadDB()
+			if err != nil {
+				t.Error(err)
+			}
+			defer db.Close()
+			ts := LogTimeSeries{db, logFile}
+			for _, logLine := range testCase.inputLines {
+				_, err = ts.Record(logLine)
+				if err != nil {
+					t.Error(err)
+				}
+			}
+			actualCounts, err := ts.GetSectionCounts(testCase.start, testCase.end)
+			if err != nil {
+				t.Error(err)
+			}
+			if !cmp.Equal(testCase.expectedCounts, actualCounts) {
+				t.Errorf("Error on case %d.\nExpected: %#v\nActual: %#v\n",
+					caseIdx, testCase.expectedCounts, actualCounts)
 			}
 		}()
 	}

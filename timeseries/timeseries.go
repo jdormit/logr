@@ -108,3 +108,27 @@ func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (s
 	err = row.Scan(&section)
 	return
 }
+
+type sectionCount struct {
+	Section string
+	Count int
+}
+
+// Returns a slice of (section, count) tuples sorted by count descending
+// from log lines between `start` and `end`
+func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []sectionCount, err error) {
+	rows, err := ts.db.Query("SELECT request_section, count(*) FROM loglines "+
+		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
+		"GROUP BY request_section "+
+		"ORDER BY count(*) DESC", ts.logFile, start.Unix(), end.Unix())
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		count := sectionCount{}
+		rows.Scan(&count.Section, &count.Count)
+		counts = append(counts, count)
+	}
+	return
+}
