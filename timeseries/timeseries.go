@@ -40,9 +40,9 @@ CREATE TABLE loglines (
 
 func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) {
 	result, err = ts.db.Exec("INSERT INTO loglines "+
-		"(remote_host, user, authuser, timestamp, request_path, response_status, response_bytes, log_file) "+
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-		logLine.Host, logLine.User, logLine.AuthUser, logLine.Timestamp,
+		"(remote_host, user, authuser, timestamp, request_method, request_path, response_status, response_bytes, log_file) "+
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+		logLine.Host, logLine.User, logLine.AuthUser, logLine.Timestamp.Unix(),
 		logLine.Method, logLine.Path, logLine.Status, logLine.ResponseBytes, ts.logFile)
 	return
 }

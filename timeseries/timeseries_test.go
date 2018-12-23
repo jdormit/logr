@@ -7,7 +7,6 @@ import (
 	"log"
 	"testing"
 	"time"
-	"os"
 )
 
 const logFile = "TestLogFile"
@@ -31,7 +30,7 @@ type logLineRow struct {
 	Ip        string
 	User      string
 	AuthUser  string
-	Timestamp time.Time
+	Timestamp int64
 	Method    string
 	Path      string
 	Status    uint16
@@ -102,7 +101,7 @@ func TestRecord(t *testing.T) {
 		"127.0.0.1",
 		"-",
 		"james",
-		parseTime("09/May/2018:16:00:39 +0000"),
+		parseTime("09/May/2018:16:00:39 +0000").Unix(),
 		"GET",
 		"/report",
 		200,
