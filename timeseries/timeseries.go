@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	_ "github.com/mattn/go-sqlite3"
 	"time"
+	"strings"
 )
 
 type LogLine struct {
@@ -30,6 +31,7 @@ CREATE TABLE loglines (
   user varchar(255),
   timestamp integer,
   request_method varchar(255),
+  request_section varchar(255),
   request_path varchar(255),
   response_status integer,
   response_bytes integer,
@@ -38,12 +40,24 @@ CREATE TABLE loglines (
 */
 // dbFile should ~/.local/share/logr/db.sqlite
 
+func extractSection(path string) string {
+	split := strings.Split(path, "/")
+	if len(split) > 1 {
+		return split[1]
+	} else {
+		return split[0]
+	}
+}
+
 func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) {
 	result, err = ts.db.Exec("INSERT INTO loglines "+
-		"(remote_host, user, authuser, timestamp, request_method, request_path, response_status, response_bytes, log_file) "+
-		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+		"(remote_host, user, authuser, timestamp, request_method, "+
+		"request_section, request_path, response_status, "+
+		"response_bytes, log_file) "+
+		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
 		logLine.Host, logLine.User, logLine.AuthUser, logLine.Timestamp.Unix(),
-		logLine.Method, logLine.Path, logLine.Status, logLine.ResponseBytes, ts.logFile)
+		logLine.Method, extractSection(logLine.Path), logLine.Path,
+		logLine.Status, logLine.ResponseBytes, ts.logFile)
 	return
 }
 
@@ -52,17 +66,45 @@ func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) 
 // }
 
 func (ts *LogTimeSeries) MostCommonStatus(start time.Time, end time.Time) (status uint16, err error) {
-	rows, err := ts.db.Query("SELECT response_status, count(*) as count FROM loglines "+
+	row := ts.db.QueryRow("SELECT response_status FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
-		"GROUP BY response_status"+
-		"ORDER BY count DESC"+
+		"GROUP BY response_status "+
+		"ORDER BY count(*) DESC "+
 		"LIMIT 1", ts.logFile, start.Unix(), end.Unix())
-	defer rows.Close()
-	rows.Next()
-	rows.Scan(&status)
+	err = row.Scan(&status)
 	return
 }
 
-func MostRequestedSection(start time.Time, end time.Time) string {
-	return "TODO"
+type statusCount struct {
+	Status uint16
+	Count int
+}
+
+// Returns a slice of (status code, count) tuples sorted by count descending
+// from log lines between `start` and `end`
+func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []statusCount, err error) {
+	rows, err := ts.db.Query("SELECT response_status, count(*) FROM loglines "+
+		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
+		"GROUP BY response_status "+
+		"ORDER BY count(*) DESC", ts.logFile, start.Unix(), end.Unix())
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		count := statusCount{}
+		rows.Scan(&count.Status, &count.Count)
+		counts = append(counts, count)
+	}
+	return
+}
+
+func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (section string, err error) {
+	row := ts.db.QueryRow("SELECT request_section FROM loglines "+
+		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
+		"GROUP BY request_section "+
+		"ORDER BY count(*) DESC "+
+		"LIMIT 1", ts.logFile, start.Unix(), end.Unix())
+	err = row.Scan(&section)
+	return
 }
