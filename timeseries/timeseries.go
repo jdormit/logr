@@ -1,15 +1,23 @@
+/*
+Package timeseries implements a time series datastore to store and query log lines.
+
+It stores the log lines in a SQL database. It does actually construct the database -
+instead, the database must be set up and passed into LogTimeSeries instances. The
+CreateLogLinesTableStmt is provided to ensure that callers can construct a database
+with the correct schema.
+*/
 package timeseries
 
 import (
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
 	"time"
 	"strings"
 )
 
-// The SQL statement to create the correct loglines table
+// CreateLogLinesTableStmt is the SQL statement to create the loglines table.
+// It should be used to initialize any database passed into a LogTimeSeries
 const CreateLogLinesTableStmt = `
-CREATE TABLE loglines (
+CREATE TABLE IF NOT EXISTS loglines (
   id integer primary key autoincrement,
   remote_host varchar(255),
   user varchar(255),
@@ -24,6 +32,7 @@ CREATE TABLE loglines (
 )
 `
 
+// LogLine is the data structure representing a single line in a server log
 type LogLine struct {
 	Host          string
 	User          string
@@ -35,28 +44,14 @@ type LogLine struct {
 	ResponseBytes int
 }
 
+// The LogTimeSeries struct is used to record and query log lines
 type LogTimeSeries struct {
 	db      *sql.DB
 	logFile string
 }
 
-// TODO create the database and the loglines table
-/* schema:
-CREATE TABLE loglines (
-  id integer auto_increment primary key,
-  remote_host varchar(255),
-  user varchar(255),
-  timestamp integer,
-  request_method varchar(255),
-  request_section varchar(255),
-  request_path varchar(255),
-  response_status integer,
-  response_bytes integer,
-  log_file varchar(255)
-)
-*/
-// dbFile should ~/.local/share/logr/db.sqlite
-
+// The extractSection function returns the part of the input string after the
+// first '/', e.g. extractSection("/api/user") returns "api".
 func extractSection(path string) string {
 	split := strings.Split(path, "/")
 	if len(split) > 1 {
@@ -66,6 +61,7 @@ func extractSection(path string) string {
 	}
 }
 
+// Record persists a LogLine to the time series datastore
 func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) {
 	result, err = ts.db.Exec("INSERT INTO loglines "+
 		"(remote_host, user, authuser, timestamp, request_method, "+
@@ -78,10 +74,8 @@ func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) 
 	return
 }
 
-// func RetrieveRange(start time.Time, end time.Time) []LogLine {
-	
-// }
-
+// MostCommonStatus returns the most common response status in all the LogLines
+// recorded between `start` and `end`.
 func (ts *LogTimeSeries) MostCommonStatus(start time.Time, end time.Time) (status uint16, err error) {
 	row := ts.db.QueryRow("SELECT response_status FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
@@ -97,8 +91,8 @@ type statusCount struct {
 	Count int
 }
 
-// Returns a slice of (status code, count) tuples sorted by count descending
-// from log lines between `start` and `end`
+// GetStatusCounts returns a slice of (status code, count) tuples sorted by count
+// (descending) from log lines recorded between `start` and `end`
 func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []statusCount, err error) {
 	rows, err := ts.db.Query("SELECT response_status, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
@@ -116,6 +110,9 @@ func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts
 	return
 }
 
+// MostRequested Section returns the most common path section in all the LogLines
+// recorded between `start` and `end`. A path section is the part of the path
+// after the first '/', e.g. the section for "/api/user" is "api"
 func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (section string, err error) {
 	row := ts.db.QueryRow("SELECT request_section FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
@@ -131,8 +128,8 @@ type sectionCount struct {
 	Count int
 }
 
-// Returns a slice of (section, count) tuples sorted by count descending
-// from log lines between `start` and `end`
+// GetSectionCounts returns a slice of (section, count) tuples sorted by count
+// (descending) from log lines recorded between `start` and `end`
 func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []sectionCount, err error) {
 	rows, err := ts.db.Query("SELECT request_section, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
