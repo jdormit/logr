@@ -25,21 +25,12 @@ type logLineRow struct {
 	LogFile   string
 }
 
-func assertRowsEqual(t *testing.T, expected, actual logLineRow) {
-	if !cmp.Equal(expected, actual) {
-		t.Errorf("Expected: %#v\nActual: %#v\n", expected, actual)
-	}
-}
-
 func loadDB() (db *sql.DB, err error) {
 	db, err = sql.Open("sqlite3", ":memory:")
 	if err != nil {
 		return
 	}
 	_, err = db.Exec(CreateLogLinesTableStmt)
-	if err != nil {
-		return
-	}
 	return
 }
 
