@@ -2,8 +2,7 @@ package timeseries
 
 import (
 	"database/sql"
-	"fmt"
-	cmp "github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp"
 	"log"
 	"testing"
 	"time"
@@ -28,7 +27,7 @@ type logLineRow struct {
 
 func assertRowsEqual(t *testing.T, expected, actual logLineRow) {
 	if !cmp.Equal(expected, actual) {
-		t.Error(fmt.Sprintf("Expected: %#v\nActual: %#v\n", expected, actual))
+		t.Errorf("Expected: %#v\nActual: %#v\n", expected, actual)
 	}
 }
 
@@ -122,8 +121,7 @@ func TestRecord(t *testing.T)  {
 
 			rowsAffected, err := result.RowsAffected()
 			if rowsAffected != 1 {
-				t.Error(fmt.Sprintf("Expected 1 row affected but got %d",
-					rowsAffected))
+				t.Errorf("Expected 1 row affected but got %d", rowsAffected)
 			}
 			actual := logLineRow{}
 			row := db.QueryRow("SELECT * FROM loglines")
@@ -134,7 +132,8 @@ func TestRecord(t *testing.T)  {
 				t.Error(err)
 			}
 			if !cmp.Equal(testCase.expectedRow, actual) {
-				t.Error(fmt.Sprintf("Error on case %d.\nExpected: %#v\nActual: %#v\n", caseIdx, testCase.expectedRow, actual))
+				t.Errorf("Error on case %d.\nExpected: %#v\nActual: %#v\n",
+					caseIdx, testCase.expectedRow, actual)
 			}
 		}()
 	}
