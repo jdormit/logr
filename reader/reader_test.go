@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-cmp/cmp"
 	"time"
 	"log"
+	"fmt"
 )
 
 const logPath = "./example.log"
@@ -22,8 +23,12 @@ func parseTime(timeStr string) time.Time {
 	return time
 }
 
-func loadDB() (db *sql.DB, err error) {
-	db, err = sql.Open("sqlite3", ":memory:")
+func loadDB(nonce string) (db *sql.DB, err error) {
+	// We want each test case to have its own in-memory db, but the db
+	// needs to be shared between all goroutines for the test case, so
+	// we give each test case a unique db name and cache=shared.
+	// See https://github.com/mattn/go-sqlite3/issues/204
+	db, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=memory&cache=shared", nonce))
 	if err != nil {
 		return
 	}
@@ -33,11 +38,11 @@ func loadDB() (db *sql.DB, err error) {
 
 func TestTailLogFile(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	os.Remove(logPath)
-	os.Create(logPath)
 
 	t.Run("basic", func(t *testing.T) {
-		db, err := loadDB()
+		os.Remove(logPath)
+		os.Create(logPath)
+		db, err := loadDB("basic")
 		if err != nil {
 			t.Error(err)
 			return
@@ -71,7 +76,9 @@ func TestTailLogFile(t *testing.T) {
 	})
 
 	t.Run("offset persistence", func(t *testing.T) {
-		db, err := loadDB()
+		os.Remove(logPath)
+		os.Create(logPath)
+		db, err := loadDB("offsetpersistence")
 		if err != nil {
 			t.Error(err)
 			return
@@ -87,10 +94,11 @@ func TestTailLogFile(t *testing.T) {
 		}
 		file.WriteString("127.0.0.1 - james [09/May/2018:16:00:39 +0000] "+
 			"\"GET /report HTTP/1.0\" 200 123\n")
+		<- logChan
 		logReader.Terminate()
 		file.WriteString("127.0.0.1 - jill [09/May/2018:16:00:41 +0000] "+
 			"\"GET /api/user HTTP/1.0\" 200 234\n")
-		logReader.TailLogFile(logPath, logChan)
+		go logReader.TailLogFile(logPath, logChan)
 		defer logReader.Terminate()
 		logLine := <- logChan
 		expected := timeseries.LogLine{

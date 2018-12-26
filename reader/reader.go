@@ -24,6 +24,7 @@ func NewLogReader(offsetPersister *offsets.OffsetPersister) logReader {
 // TailLogFile reads lines from the end of a log file and sends them over `logChan`.
 // It will loop forever until a call to logReader.Terminate().
 func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogLine) {
+	lr.shouldTerminate = false
 	file, err := os.Open(filepath)
 	if err != nil {
 		log.Fatalf("Error opening log file: %v", err)
@@ -34,15 +35,20 @@ func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogL
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Printf("Found offset %d for %s\n", latestOffset, filepath)
 	defer func() {
-		log.Printf("Persisting offset %d for %s\n", latestOffset, filepath)
-		lr.offsetPersister.PersistOffset(filepath, latestOffset)
+		err = lr.offsetPersister.PersistOffset(filepath, latestOffset)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}()
 
-	file.Seek(latestOffset, 0)
-
 	scanner := bufio.NewScanner(file)
+
+	// Skip to the latest offset
+	for i := int64(0); i < latestOffset; i++ {
+		scanner.Scan()
+	}
+
 	for !lr.shouldTerminate {
 		if scanner.Scan() {
 			latestOffset = latestOffset + 1
