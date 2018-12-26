@@ -1,11 +1,11 @@
 package parser
 
 import (
+	"github.com/google/go-cmp/cmp"
 	"github.com/jdormit/logr/timeseries"
 	"log"
 	"testing"
 	"time"
-	"github.com/google/go-cmp/cmp"
 )
 
 func parseTime(timeStr string) time.Time {
@@ -36,11 +36,11 @@ func TestParseLogLine(t *testing.T) {
 			},
 		},
 		{
-			inputLine: `Not a real log line`,
+			inputLine:     `Not a real log line`,
 			expectedError: ParseError,
 		},
 		{
-			inputLine: ``,
+			inputLine:     ``,
 			expectedError: ParseError,
 		},
 		{

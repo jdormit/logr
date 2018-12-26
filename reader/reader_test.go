@@ -1,16 +1,16 @@
 package reader
 
 import (
-	"os"
-	"testing"
 	"database/sql"
-	_ "github.com/mattn/go-sqlite3"
+	"fmt"
+	"github.com/google/go-cmp/cmp"
 	"github.com/jdormit/logr/offsets"
 	"github.com/jdormit/logr/timeseries"
-	"github.com/google/go-cmp/cmp"
-	"time"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
-	"fmt"
+	"os"
+	"testing"
+	"time"
 )
 
 const logPath = "./example.log"
@@ -36,6 +36,16 @@ func loadDB(nonce string) (db *sql.DB, err error) {
 	return
 }
 
+func awaitLogLine(t *testing.T, c <-chan timeseries.LogLine, timeout int) timeseries.LogLine {
+	select {
+	case logLine := <-c:
+		return logLine
+	case <-time.After(time.Duration(timeout) * time.Second):
+		t.Fatalf("Did not receive log line after %d seconds", timeout)
+	}
+	panic("Did not time out or receive log line")
+}
+
 func TestTailLogFile(t *testing.T) {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
@@ -57,9 +67,9 @@ func TestTailLogFile(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		file.WriteString("127.0.0.1 - james [09/May/2018:16:00:39 +0000] "+
+		file.WriteString("127.0.0.1 - james [09/May/2018:16:00:39 +0000] " +
 			"\"GET /report HTTP/1.0\" 200 123\n")
-		logLine := <- logChan
+		logLine := awaitLogLine(t, logChan, 2)
 		expected := timeseries.LogLine{
 			"127.0.0.1",
 			"-",
@@ -69,6 +79,22 @@ func TestTailLogFile(t *testing.T) {
 			"/report",
 			200,
 			123,
+		}
+		if !cmp.Equal(logLine, expected) {
+			t.Errorf("Expected: %#v\nActual: %#v\n", expected, logLine)
+		}
+		file.WriteString("127.0.0.1 - jill [09/May/2018:16:00:41 +0000] " +
+			"\"GET /api/user HTTP/1.0\" 200 234\n")
+		logLine = awaitLogLine(t, logChan, 2)
+		expected = timeseries.LogLine{
+			"127.0.0.1",
+			"-",
+			"jill",
+			parseTime("09/May/2018:16:00:41 +0000"),
+			"GET",
+			"/api/user",
+			200,
+			234,
 		}
 		if !cmp.Equal(logLine, expected) {
 			t.Errorf("Expected: %#v\nActual: %#v\n", expected, logLine)
@@ -92,15 +118,15 @@ func TestTailLogFile(t *testing.T) {
 			t.Error(err)
 			return
 		}
-		file.WriteString("127.0.0.1 - james [09/May/2018:16:00:39 +0000] "+
+		file.WriteString("127.0.0.1 - james [09/May/2018:16:00:39 +0000] " +
 			"\"GET /report HTTP/1.0\" 200 123\n")
-		<- logChan
+		awaitLogLine(t, logChan, 2)
 		logReader.Terminate()
-		file.WriteString("127.0.0.1 - jill [09/May/2018:16:00:41 +0000] "+
+		file.WriteString("127.0.0.1 - jill [09/May/2018:16:00:41 +0000] " +
 			"\"GET /api/user HTTP/1.0\" 200 234\n")
 		go logReader.TailLogFile(logPath, logChan)
 		defer logReader.Terminate()
-		logLine := <- logChan
+		logLine := awaitLogLine(t, logChan, 2)
 		expected := timeseries.LogLine{
 			"127.0.0.1",
 			"-",

@@ -3,10 +3,10 @@ package timeseries
 import (
 	"database/sql"
 	"github.com/google/go-cmp/cmp"
+	_ "github.com/mattn/go-sqlite3"
 	"log"
 	"testing"
 	"time"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 const logFile = "TestLogFile"
@@ -61,10 +61,10 @@ func TestExtractSection(t *testing.T) {
 	}
 }
 
-func TestRecord(t *testing.T)  {
+func TestRecord(t *testing.T) {
 	var emptyTimestamp time.Time
-	testCases := []struct{
-		inputRow LogLine
+	testCases := []struct {
+		inputRow    LogLine
 		expectedRow logLineRow
 	}{
 		{
@@ -131,11 +131,11 @@ func TestRecord(t *testing.T)  {
 }
 
 func TestMostCommonStatus(t *testing.T) {
-	testCases := []struct{
-		inputLines []LogLine
+	testCases := []struct {
+		inputLines     []LogLine
 		expectedStatus uint16
-		start time.Time
-		end time.Time
+		start          time.Time
+		end            time.Time
 	}{
 		{
 			[]LogLine{
@@ -358,11 +358,11 @@ func TestItHandlesMostCommonStatusForEmptyDb(t *testing.T) {
 }
 
 func TestGetStatusCounts(t *testing.T) {
-	testCases := []struct{
-		inputLines []LogLine
+	testCases := []struct {
+		inputLines     []LogLine
 		expectedCounts []statusCount
-		start time.Time
-		end time.Time
+		start          time.Time
+		end            time.Time
 	}{
 		{
 			[]LogLine{
@@ -598,11 +598,11 @@ func TestMostRequestSectionEmptyDb(t *testing.T) {
 }
 
 func TestGetSectionCounts(t *testing.T) {
-	testCases := []struct{
-		inputLines []LogLine
+	testCases := []struct {
+		inputLines     []LogLine
 		expectedCounts []sectionCount
-		start time.Time
-		end time.Time
+		start          time.Time
+		end            time.Time
 	}{
 		{
 			[]LogLine{
@@ -637,7 +637,7 @@ func TestGetSectionCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]sectionCount {
+			[]sectionCount{
 				{"report", 2},
 				{"api", 1},
 			},
@@ -677,7 +677,7 @@ func TestGetSectionCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]sectionCount {
+			[]sectionCount{
 				{"api", 1},
 				{"report", 1},
 			},

@@ -10,8 +10,8 @@ package timeseries
 
 import (
 	"database/sql"
-	"time"
 	"strings"
+	"time"
 )
 
 // CreateLogLinesTableStmt is the SQL statement to create the loglines table.
@@ -46,8 +46,8 @@ type LogLine struct {
 
 // The LogTimeSeries struct is used to record and query log lines
 type LogTimeSeries struct {
-	db      *sql.DB
-	logFile string
+	DB      *sql.DB
+	LogFile string
 }
 
 // The extractSection function returns the part of the input string after the
@@ -63,41 +63,41 @@ func extractSection(path string) string {
 
 // Record persists a LogLine to the time series datastore
 func (ts *LogTimeSeries) Record(logLine LogLine) (result sql.Result, err error) {
-	result, err = ts.db.Exec("INSERT INTO loglines "+
+	result, err = ts.DB.Exec("INSERT INTO loglines "+
 		"(remote_host, user, authuser, timestamp, request_method, "+
 		"request_section, request_path, response_status, "+
 		"response_bytes, log_file) "+
 		"VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
 		logLine.Host, logLine.User, logLine.AuthUser, logLine.Timestamp.Unix(),
 		logLine.Method, extractSection(logLine.Path), logLine.Path,
-		logLine.Status, logLine.ResponseBytes, ts.logFile)
+		logLine.Status, logLine.ResponseBytes, ts.LogFile)
 	return
 }
 
 // MostCommonStatus returns the most common response status in all the LogLines
 // recorded between `start` and `end`.
 func (ts *LogTimeSeries) MostCommonStatus(start time.Time, end time.Time) (status uint16, err error) {
-	row := ts.db.QueryRow("SELECT response_status FROM loglines "+
+	row := ts.DB.QueryRow("SELECT response_status FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY response_status "+
 		"ORDER BY count(*) DESC "+
-		"LIMIT 1", ts.logFile, start.Unix(), end.Unix())
+		"LIMIT 1", ts.LogFile, start.Unix(), end.Unix())
 	err = row.Scan(&status)
 	return
 }
 
 type statusCount struct {
 	Status uint16
-	Count int
+	Count  int
 }
 
 // GetStatusCounts returns a slice of (status code, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
 func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []statusCount, err error) {
-	rows, err := ts.db.Query("SELECT response_status, count(*) FROM loglines "+
+	rows, err := ts.DB.Query("SELECT response_status, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY response_status "+
-		"ORDER BY count(*) DESC", ts.logFile, start.Unix(), end.Unix())
+		"ORDER BY count(*) DESC", ts.LogFile, start.Unix(), end.Unix())
 	if err != nil {
 		return
 	}
@@ -114,27 +114,27 @@ func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts
 // recorded between `start` and `end`. A path section is the part of the path
 // after the first '/', e.g. the section for "/api/user" is "api"
 func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (section string, err error) {
-	row := ts.db.QueryRow("SELECT request_section FROM loglines "+
+	row := ts.DB.QueryRow("SELECT request_section FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY request_section "+
 		"ORDER BY count(*) DESC "+
-		"LIMIT 1", ts.logFile, start.Unix(), end.Unix())
+		"LIMIT 1", ts.LogFile, start.Unix(), end.Unix())
 	err = row.Scan(&section)
 	return
 }
 
 type sectionCount struct {
 	Section string
-	Count int
+	Count   int
 }
 
 // GetSectionCounts returns a slice of (section, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
 func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []sectionCount, err error) {
-	rows, err := ts.db.Query("SELECT request_section, count(*) FROM loglines "+
+	rows, err := ts.DB.Query("SELECT request_section, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY request_section "+
-		"ORDER BY count(*) DESC", ts.logFile, start.Unix(), end.Unix())
+		"ORDER BY count(*) DESC", ts.LogFile, start.Unix(), end.Unix())
 	if err != nil {
 		return
 	}

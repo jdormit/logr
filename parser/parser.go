@@ -2,13 +2,13 @@
 package parser
 
 import (
+	"errors"
 	"github.com/jdormit/logr/timeseries"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
-	"regexp"
-	"errors"
 )
 
 // A ParseError is returned when a log line cannot be parsed

@@ -2,12 +2,13 @@
 package reader
 
 import (
-	"github.com/jdormit/logr/timeseries"
+	"bufio"
 	"github.com/jdormit/logr/offsets"
 	"github.com/jdormit/logr/parser"
-	"bufio"
-	"os"
+	"github.com/jdormit/logr/timeseries"
+	"io"
 	"log"
+	"os"
 )
 
 // A logReader tails a log file. It should be instantiated via reader.NewLogReader().
@@ -42,25 +43,26 @@ func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogL
 		}
 	}()
 
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
 
 	// Skip to the latest offset
 	for i := int64(0); i < latestOffset; i++ {
-		scanner.Scan()
+		reader.ReadString('\n')
 	}
 
 	for !lr.shouldTerminate {
-		if scanner.Scan() {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			if err != io.EOF {
+				log.Printf("Fatal error scanning log file: %v\nTerminating\n", err)
+				lr.Terminate()
+			}
+		} else {
 			latestOffset = latestOffset + 1
-			logLineStr := scanner.Text()
-			logLine, err := parser.ParseLogLine(logLineStr)
+			logLine, err := parser.ParseLogLine(line)
 			if err == nil {
 				logChan <- logLine
 			}
-		} else if scanner.Err() != nil {
-			log.Printf("Fatal error scanning log file: %v\nTerminating\n",
-				scanner.Err())
-			lr.Terminate()
 		}
 	}
 }
