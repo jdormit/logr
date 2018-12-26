@@ -86,14 +86,14 @@ func (ts *LogTimeSeries) MostCommonStatus(start time.Time, end time.Time) (statu
 	return
 }
 
-type statusCount struct {
+type StatusCount struct {
 	Status uint16
 	Count  int
 }
 
 // GetStatusCounts returns a slice of (status code, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
-func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []statusCount, err error) {
+func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []StatusCount, err error) {
 	rows, err := ts.DB.Query("SELECT response_status, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY response_status "+
@@ -103,7 +103,7 @@ func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts
 	}
 	defer rows.Close()
 	for rows.Next() {
-		count := statusCount{}
+		count := StatusCount{}
 		rows.Scan(&count.Status, &count.Count)
 		counts = append(counts, count)
 	}
@@ -123,14 +123,14 @@ func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (s
 	return
 }
 
-type sectionCount struct {
+type SectionCount struct {
 	Section string
 	Count   int
 }
 
 // GetSectionCounts returns a slice of (section, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
-func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []sectionCount, err error) {
+func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []SectionCount, err error) {
 	rows, err := ts.DB.Query("SELECT request_section, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY request_section "+
@@ -140,7 +140,7 @@ func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (count
 	}
 	defer rows.Close()
 	for rows.Next() {
-		count := sectionCount{}
+		count := SectionCount{}
 		rows.Scan(&count.Section, &count.Count)
 		counts = append(counts, count)
 	}
