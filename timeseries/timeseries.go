@@ -86,14 +86,14 @@ func (ts *LogTimeSeries) MostCommonStatus(start time.Time, end time.Time) (statu
 	return
 }
 
-type StatusCount struct {
-	Status uint16
-	Count  int
+type Count struct {
+	Label string
+	Count int
 }
 
 // GetStatusCounts returns a slice of (status code, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
-func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []StatusCount, err error) {
+func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts []Count, err error) {
 	rows, err := ts.DB.Query("SELECT response_status, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY response_status "+
@@ -103,8 +103,8 @@ func (ts *LogTimeSeries) GetStatusCounts(start time.Time, end time.Time) (counts
 	}
 	defer rows.Close()
 	for rows.Next() {
-		count := StatusCount{}
-		rows.Scan(&count.Status, &count.Count)
+		count := Count{}
+		rows.Scan(&count.Label, &count.Count)
 		counts = append(counts, count)
 	}
 	return
@@ -123,14 +123,9 @@ func (ts *LogTimeSeries) MostRequestedSection(start time.Time, end time.Time) (s
 	return
 }
 
-type SectionCount struct {
-	Section string
-	Count   int
-}
-
 // GetSectionCounts returns a slice of (section, count) tuples sorted by count
 // (descending) from log lines recorded between `start` and `end`
-func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []SectionCount, err error) {
+func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (counts []Count, err error) {
 	rows, err := ts.DB.Query("SELECT request_section, count(*) FROM loglines "+
 		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
 		"GROUP BY request_section "+
@@ -140,8 +135,8 @@ func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (count
 	}
 	defer rows.Close()
 	for rows.Next() {
-		count := SectionCount{}
-		rows.Scan(&count.Section, &count.Count)
+		count := Count{}
+		rows.Scan(&count.Label, &count.Count)
 		counts = append(counts, count)
 	}
 	return

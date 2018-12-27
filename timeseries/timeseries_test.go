@@ -360,7 +360,7 @@ func TestItHandlesMostCommonStatusForEmptyDb(t *testing.T) {
 func TestGetStatusCounts(t *testing.T) {
 	testCases := []struct {
 		inputLines     []LogLine
-		expectedCounts []statusCount
+		expectedCounts []Count
 		start          time.Time
 		end            time.Time
 	}{
@@ -397,9 +397,9 @@ func TestGetStatusCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]statusCount{
-				{200, 2},
-				{500, 1},
+			[]Count{
+				{"200", 2},
+				{"500", 1},
 			},
 			parseTime("09/May/2018:15:00:39 +0000"),
 			parseTime("09/May/2018:19:00:39 +0000"),
@@ -437,9 +437,9 @@ func TestGetStatusCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]statusCount{
-				{200, 1},
-				{500, 1},
+			[]Count{
+				{"200", 1},
+				{"500", 1},
 			},
 			parseTime("09/May/2018:17:00:00 +0000"),
 			parseTime("09/May/2018:19:00:00 +0000"),
@@ -463,6 +463,7 @@ func TestGetStatusCounts(t *testing.T) {
 				_, err = ts.Record(logLine)
 				if err != nil {
 					t.Error(err)
+
 				}
 			}
 			actualCounts, err := ts.GetStatusCounts(testCase.start, testCase.end)
@@ -600,7 +601,7 @@ func TestMostRequestSectionEmptyDb(t *testing.T) {
 func TestGetSectionCounts(t *testing.T) {
 	testCases := []struct {
 		inputLines     []LogLine
-		expectedCounts []sectionCount
+		expectedCounts []Count
 		start          time.Time
 		end            time.Time
 	}{
@@ -637,7 +638,7 @@ func TestGetSectionCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]sectionCount{
+			[]Count{
 				{"report", 2},
 				{"api", 1},
 			},
@@ -677,7 +678,7 @@ func TestGetSectionCounts(t *testing.T) {
 					123,
 				},
 			},
-			[]sectionCount{
+			[]Count{
 				{"api", 1},
 				{"report", 1},
 			},

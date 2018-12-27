@@ -14,43 +14,40 @@ import (
 // A logReader tails a log file. It should be instantiated via reader.NewLogReader().
 type logReader struct {
 	offsetPersister *offsets.OffsetPersister
-	shouldTerminate bool
+	terminated      bool
+	filepath        string
+	offset          int64
 }
 
 // NewLogReader returns a new logReader struct.
-func NewLogReader(offsetPersister *offsets.OffsetPersister) logReader {
-	return logReader{offsetPersister, false}
+func NewLogReader(offsetPersister *offsets.OffsetPersister, filename string) logReader {
+	return logReader{offsetPersister, true, filename, 0}
 }
 
 // TailLogFile reads lines from the end of a log file and sends them over `logChan`.
 // It will loop forever until a call to logReader.Terminate().
-func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogLine) {
-	lr.shouldTerminate = false
-	file, err := os.Open(filepath)
+func (lr *logReader) TailLogFile(logChan chan<- timeseries.LogLine) {
+	lr.terminated = false
+	file, err := os.Open(lr.filepath)
 	if err != nil {
 		log.Fatalf("Error opening log file: %v", err)
 	}
 	defer file.Close()
 
-	latestOffset, err := lr.offsetPersister.GetOffset(filepath)
+	latestOffset, err := lr.offsetPersister.GetOffset(lr.filepath)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer func() {
-		err = lr.offsetPersister.PersistOffset(filepath, latestOffset)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
+	lr.offset = latestOffset
 
 	reader := bufio.NewReader(file)
 
 	// Skip to the latest offset
-	for i := int64(0); i < latestOffset; i++ {
+	for i := int64(0); i < lr.offset; i++ {
 		reader.ReadString('\n')
 	}
 
-	for !lr.shouldTerminate {
+	for !lr.terminated {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if err != io.EOF {
@@ -58,7 +55,7 @@ func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogL
 				lr.Terminate()
 			}
 		} else {
-			latestOffset = latestOffset + 1
+			lr.offset = lr.offset + 1
 			logLine, err := parser.ParseLogLine(line)
 			if err == nil {
 				logChan <- logLine
@@ -67,6 +64,8 @@ func (lr *logReader) TailLogFile(filepath string, logChan chan<- timeseries.LogL
 	}
 }
 
-func (lr *logReader) Terminate() {
-	lr.shouldTerminate = true
+func (lr *logReader) Terminate() (err error) {
+	lr.terminated = true
+	err = lr.offsetPersister.PersistOffset(lr.filepath, lr.offset)
+	return
 }

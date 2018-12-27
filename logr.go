@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"fmt"
+	"github.com/gizak/termui"
 	"github.com/jdormit/logr/offsets"
 	"github.com/jdormit/logr/reader"
 	"github.com/jdormit/logr/timeseries"
@@ -14,8 +15,9 @@ import (
 	"os/signal"
 	"path"
 	"time"
-	"github.com/gizak/termui"
 )
+
+const defaultTimescale = 5
 
 var defaultLogPath = path.Join(os.TempDir(), "access.log")
 
@@ -49,12 +51,17 @@ func loadDB(dbPath string) (db *sql.DB, err error) {
 	return
 }
 
-func nextUIState(state ui.UIState, ts *timeseries.LogTimeSeries) ui.UIState {
+func nextUIState(state *ui.UIState, ts *timeseries.LogTimeSeries) *ui.UIState {
 	now := time.Now()
 
+	log.Printf("now: %s, begin: %s, end: %s",
+		now.Format(time.RFC850), state.Begin.Format(time.RFC850),
+		state.End.Format(time.RFC850))
+
 	if state.End.Before(now) {
+		log.Printf("updating begin and end")
 		state.Begin = now
-		state.End = state.Begin.Add(time.Duration(5) * time.Minute)
+		state.End = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
 	}
 
 	sectionCounts, err := ts.GetSectionCounts(state.Begin, state.End)
@@ -62,6 +69,13 @@ func nextUIState(state ui.UIState, ts *timeseries.LogTimeSeries) ui.UIState {
 		log.Fatal(err)
 	}
 	state.SectionCounts = sectionCounts
+
+	statusCounts, err := ts.GetStatusCounts(state.Begin, state.End)
+	if err != nil {
+		log.Fatal(err)
+	}
+	state.StatusCounts = statusCounts
+
 	return state
 }
 
@@ -110,7 +124,7 @@ func main() {
 	}
 
 	offsetPersister := offsets.OffsetPersister{db}
-	logReader := reader.NewLogReader(&offsetPersister)
+	logReader := reader.NewLogReader(&offsetPersister, logPath)
 
 	interrupts := make(chan os.Signal, 1)
 	signal.Notify(interrupts, os.Interrupt)
@@ -118,7 +132,8 @@ func main() {
 	updateTicker := time.NewTicker(time.Second).C
 
 	logChan := make(chan timeseries.LogLine, 24)
-	go logReader.TailLogFile(logPath, logChan)
+	go logReader.TailLogFile(logChan)
+	defer logReader.Terminate()
 
 	logTimeSeries := timeseries.LogTimeSeries{db, logPath}
 
@@ -129,17 +144,23 @@ func main() {
 	defer termui.Close()
 
 	begin := time.Now()
-	end := begin.Add(time.Duration(5) * time.Minute)
+	end := begin.Add(time.Duration(defaultTimescale) * time.Minute)
 	sectionCounts, err := logTimeSeries.GetSectionCounts(begin, end)
 	if err != nil {
 		log.Fatal(err)
 	}
-	uiState := ui.UIState{
-		Begin: begin,
-		End:   end,
-		SectionCounts: sectionCounts,
+	statusCounts, err := logTimeSeries.GetStatusCounts(begin, end)
+	if err != nil {
+		log.Fatal(err)
 	}
-	ui.Render(uiState)
+	uiState := &ui.UIState{
+		Timescale:     defaultTimescale,
+		Begin:         begin,
+		End:           end,
+		SectionCounts: sectionCounts,
+		StatusCounts:  statusCounts,
+	}
+	ui.Render(*uiState)
 
 	uiEvents := termui.PollEvents()
 
@@ -151,9 +172,10 @@ func main() {
 		case e := <-uiEvents:
 			switch e.ID {
 			case "<C-c>":
+				logReader.Terminate()
 				return
 			case "<Resize>":
-				ui.Render(uiState)
+				ui.Render(*uiState)
 			}
 		case logLine := <-logChan:
 			_, err = logTimeSeries.Record(logLine)
@@ -162,7 +184,7 @@ func main() {
 			}
 		case <-updateTicker:
 			uiState := nextUIState(uiState, &logTimeSeries)
-			ui.Render(uiState)
+			ui.Render(*uiState)
 			// Update UI
 		}
 	}

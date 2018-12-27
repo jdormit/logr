@@ -58,9 +58,9 @@ func TestTailLogFile(t *testing.T) {
 			return
 		}
 		offsetPersister := offsets.OffsetPersister{db}
-		logReader := NewLogReader(&offsetPersister)
+		logReader := NewLogReader(&offsetPersister, logPath)
 		logChan := make(chan timeseries.LogLine)
-		go logReader.TailLogFile(logPath, logChan)
+		go logReader.TailLogFile(logChan)
 		defer logReader.Terminate()
 		file, err := os.OpenFile(logPath, os.O_RDWR, 0644)
 		if err != nil {
@@ -110,9 +110,9 @@ func TestTailLogFile(t *testing.T) {
 			return
 		}
 		offsetPersister := offsets.OffsetPersister{db}
-		logReader := NewLogReader(&offsetPersister)
+		logReader := NewLogReader(&offsetPersister, logPath)
 		logChan := make(chan timeseries.LogLine)
-		go logReader.TailLogFile(logPath, logChan)
+		go logReader.TailLogFile(logChan)
 		file, err := os.OpenFile(logPath, os.O_RDWR, 0644)
 		if err != nil {
 			t.Error(err)
@@ -124,7 +124,7 @@ func TestTailLogFile(t *testing.T) {
 		logReader.Terminate()
 		file.WriteString("127.0.0.1 - jill [09/May/2018:16:00:41 +0000] " +
 			"\"GET /api/user HTTP/1.0\" 200 234\n")
-		go logReader.TailLogFile(logPath, logChan)
+		go logReader.TailLogFile(logChan)
 		defer logReader.Terminate()
 		logLine := awaitLogLine(t, logChan, 2)
 		expected := timeseries.LogLine{
