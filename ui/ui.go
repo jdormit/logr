@@ -7,18 +7,18 @@ import (
 	"time"
 )
 
-type TrafficAtTime struct {
-	Timestamp time.Time
-	Traffic   int
-}
+// Traffic is a length-`UIState.Granularity` list of traffic readings,
+// representing the total traffic for each bucket of time in the current time window
+type Traffic []int
 
 type UIState struct {
 	SectionCounts []timeseries.Count
 	StatusCounts  []timeseries.Count
-	Traffic       []TrafficAtTime
+	Traffic       Traffic
 	Begin         time.Time
 	End           time.Time
 	Timescale     int
+	Granularity   int
 }
 
 func noData() (noData *termui.Paragraph) {
@@ -112,6 +112,27 @@ func summaryStats(state UIState) (stats *termui.Paragraph) {
 	return
 }
 
+func trafficGraph(state UIState) (graph termui.GridBufferer) {
+	chart := termui.NewBarChart()
+	chart.Data = state.Traffic
+	labels := make([]string, state.Granularity)
+	bucketDuration := state.End.Sub(state.Begin) / time.Duration(state.Granularity)
+	for i := range labels {
+		bucketTime := state.Begin.Add(bucketDuration * time.Duration(i))
+		labels[i] = bucketTime.Format("15:04:05")
+	}
+	chart.DataLabels = labels
+	chart.BorderLabel = "Site Traffic"
+	chart.Height = 9
+	chart.PaddingTop = 1
+	chart.TextColor = termui.ColorBlack
+	chart.BarColor = termui.ColorYellow
+	chart.NumColor = termui.ColorBlack
+	chart.BarWidth = termui.TermWidth()/state.Granularity - 1
+	graph = chart
+	return
+}
+
 func Render(state UIState) {
 	header := header(state)
 
@@ -121,10 +142,13 @@ func Render(state UIState) {
 	statusHeader := statusHeader()
 	statusGraph := statusGraph(state)
 
+	trafficChart := trafficGraph(state)
+
 	grid := termui.NewGrid()
 	grid.Width = termui.TermWidth()
 	grid.AddRows(
 		termui.NewRow(termui.NewCol(12, 0, header)),
+		termui.NewRow(termui.NewCol(12, 0, trafficChart)),
 		termui.NewRow(
 			termui.NewCol(6, 0, sectionHeader),
 			termui.NewCol(6, 0, statusHeader)),

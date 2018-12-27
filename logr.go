@@ -7,6 +7,7 @@ import (
 	"github.com/gizak/termui"
 	"github.com/jdormit/logr/offsets"
 	"github.com/jdormit/logr/reader"
+	"github.com/jdormit/logr/timebucketer"
 	"github.com/jdormit/logr/timeseries"
 	"github.com/jdormit/logr/ui"
 	_ "github.com/mattn/go-sqlite3"
@@ -18,6 +19,7 @@ import (
 )
 
 const defaultTimescale = 5
+const defaultGranularity = 20
 
 var defaultLogPath = path.Join(os.TempDir(), "access.log")
 
@@ -54,12 +56,7 @@ func loadDB(dbPath string) (db *sql.DB, err error) {
 func nextUIState(state *ui.UIState, ts *timeseries.LogTimeSeries) *ui.UIState {
 	now := time.Now()
 
-	log.Printf("now: %s, begin: %s, end: %s",
-		now.Format(time.RFC850), state.Begin.Format(time.RFC850),
-		state.End.Format(time.RFC850))
-
 	if state.End.Before(now) {
-		log.Printf("updating begin and end")
 		state.Begin = now
 		state.End = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
 	}
@@ -75,6 +72,17 @@ func nextUIState(state *ui.UIState, ts *timeseries.LogTimeSeries) *ui.UIState {
 		log.Fatal(err)
 	}
 	state.StatusCounts = statusCounts
+
+	logLines, err := ts.GetLogLines(state.Begin, state.End)
+	if err != nil {
+		log.Fatal(err)
+	}
+	timeBuckets := timebucketer.Bucket(state.Begin, state.End, state.Granularity, logLines)
+	traffic := make([]int, state.Granularity)
+	for i, bucket := range timeBuckets {
+		traffic[i] = len(bucket)
+	}
+	state.Traffic = traffic
 
 	return state
 }
@@ -153,12 +161,23 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	logLines, err := logTimeSeries.GetLogLines(begin, end)
+	if err != nil {
+		log.Fatal(err)
+	}
+	timeBuckets := timebucketer.Bucket(begin, end, defaultGranularity, logLines)
+	traffic := make([]int, defaultGranularity)
+	for i, bucket := range timeBuckets {
+		traffic[i] = len(bucket)
+	}
 	uiState := &ui.UIState{
 		Timescale:     defaultTimescale,
 		Begin:         begin,
 		End:           end,
 		SectionCounts: sectionCounts,
 		StatusCounts:  statusCounts,
+		Traffic:       traffic,
+		Granularity:   defaultGranularity,
 	}
 	ui.Render(*uiState)
 

@@ -141,3 +141,24 @@ func (ts *LogTimeSeries) GetSectionCounts(start time.Time, end time.Time) (count
 	}
 	return
 }
+
+func (ts *LogTimeSeries) GetLogLines(start time.Time, end time.Time) (logLines []LogLine, err error) {
+	rows, err := ts.DB.Query("SELECT remote_host, user, authuser, timestamp, "+
+		"request_method, request_path, response_status, response_bytes "+
+		"FROM loglines "+
+		"WHERE log_file LIKE $1 AND timestamp BETWEEN $2 AND $3 "+
+		"ORDER BY timestamp DESC", ts.LogFile, start.Unix(), end.Unix())
+	if err != nil {
+		return
+	}
+	defer rows.Close()
+	for rows.Next() {
+		logLine := LogLine{}
+		var timestamp int64
+		rows.Scan(&logLine.Host, &logLine.User, &logLine.AuthUser, &timestamp,
+			&logLine.Method, &logLine.Path, &logLine.Status, &logLine.ResponseBytes)
+		logLine.Timestamp = time.Unix(timestamp, 0)
+		logLines = append(logLines, logLine)
+	}
+	return
+}

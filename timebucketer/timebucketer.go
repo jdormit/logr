@@ -22,9 +22,9 @@ func whichBucket(begin time.Time, end time.Time, numBuckets int, beginBucket int
 	if timestamp.Unix() >= low && timestamp.Unix() < high {
 		return currentBucket
 	} else if timestamp.Unix() < low {
-		return whichBucket(begin, end, numBuckets, beginBucket, currentBucket, timestamp)
+		return whichBucket(begin, end, numBuckets, beginBucket, currentBucket-1, timestamp)
 	} else {
-		return whichBucket(begin, end, numBuckets, currentBucket, endBucket, timestamp)
+		return whichBucket(begin, end, numBuckets, currentBucket+1, endBucket, timestamp)
 	}
 }
 

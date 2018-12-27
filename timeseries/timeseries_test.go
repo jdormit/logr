@@ -717,3 +717,255 @@ func TestGetSectionCounts(t *testing.T) {
 		}()
 	}
 }
+
+func TestGetLogLines(t *testing.T) {
+	testCases := []struct {
+		inputRows      []LogLine
+		begin          time.Time
+		end            time.Time
+		expectedOutput []LogLine
+	}{
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:16:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:19:00:00 +0000"),
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+			},
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:16:00:00 +0000"),
+			parseTime("09/May/2018:18:00:00 +0000"),
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:16:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:39 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:18:00:39 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("08/May/2018:16:00:00 +0000"),
+			parseTime("08/May/2018:19:00:00 +0000"),
+			nil,
+		},
+	}
+	for caseIdx, testCase := range testCases {
+		func() {
+			db, err := loadDB()
+			if err != nil {
+				t.Error(err)
+			}
+			defer db.Close()
+			ts := LogTimeSeries{db, logFile}
+			for _, logLine := range testCase.inputRows {
+				ts.Record(logLine)
+			}
+			actual, err := ts.GetLogLines(testCase.begin, testCase.end)
+			if err != nil {
+				t.Error(err)
+			}
+			if !cmp.Equal(testCase.expectedOutput, actual) {
+				t.Errorf("Error on test case %d.\nExpected: %+v\nActual: %+v",
+					caseIdx, testCase.expectedOutput, actual)
+			}
+		}()
+	}
+}
