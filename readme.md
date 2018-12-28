@@ -21,6 +21,12 @@ Logr can be installed as a standalone binary via [`go get`](https://golang.org/c
 
     $ go get github.com/jdormit/logr
 	
+Alternatively, you can build it from source:
+
+    $ git clone https://github.com/jdormit/logr
+	$ cd logr
+	$ go install
+
 Logr will then be available as `$GOPATH/bin/logr`:
 
     $ logr -h
