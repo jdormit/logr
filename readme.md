@@ -17,7 +17,7 @@ Logr is a command-line dashboard for monitoring actively-written-to [W3C-formatt
 - Persists offset into log file: if you quit Logr and re-run it on the same log file, it will pick up where it left off and not miss any data points
 
 ## Installation and Usage
-Logr can be installed as a standalone binary via [`go get`]:
+Logr can be installed as a standalone binary via [`go get`](https://golang.org/cmd/go/):
 
     $ go get github.com/jdormit/logr
 	
@@ -25,7 +25,7 @@ Logr will then be available as `$GOPATH/bin/logr`:
 
     $ logr -h
     A small utility to monitor a server log file
-    
+
     USAGE:
       logr [OPTIONS] [log_file_path]
     
