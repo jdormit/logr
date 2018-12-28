@@ -19,7 +19,9 @@ import (
 )
 
 const defaultTimescale = 5
-const defaultGranularity = 20
+const defaultGranularity = 10
+const defaultAlertThreshold = 10.0
+const defaultAlertInterval = 120
 
 var defaultLogPath = path.Join(os.TempDir(), "access.log")
 
@@ -53,40 +55,6 @@ func loadDB(dbPath string) (db *sql.DB, err error) {
 	return
 }
 
-func nextUIState(state *ui.UIState, ts *timeseries.LogTimeSeries) *ui.UIState {
-	now := time.Now()
-
-	if state.End.Before(now) {
-		state.Begin = now
-		state.End = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
-	}
-
-	sectionCounts, err := ts.GetSectionCounts(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	state.SectionCounts = sectionCounts
-
-	statusCounts, err := ts.GetStatusCounts(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	state.StatusCounts = statusCounts
-
-	logLines, err := ts.GetLogLines(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	timeBuckets := timebucketer.Bucket(state.Begin, state.End, state.Granularity, logLines)
-	traffic := make([]int, state.Granularity)
-	for i, bucket := range timeBuckets {
-		traffic[i] = len(bucket)
-	}
-	state.Traffic = traffic
-
-	return state
-}
-
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	flag.Usage = usage
@@ -96,6 +64,9 @@ func main() {
 
 	defaultDbPath := path.Join(os.Getenv("HOME"), ".local", "share", "logr", "logr.sqlite")
 	dbPath := flag.String("dbPath", defaultDbPath, "The `path` to the SQLite database")
+
+	alertThreshold := flag.Float64("alertThreshold", defaultAlertThreshold, "The average number of requests per second over the alerting interval that will trigger an alert")
+	alertInterval := flag.Int("alertInterval", defaultAlertInterval, "The interval of time in seconds during which the number of requests per second must exceed the alert threshold to trigger an alert")
 
 	flag.Parse()
 
@@ -171,13 +142,16 @@ func main() {
 		traffic[i] = len(bucket)
 	}
 	uiState := &ui.UIState{
-		Timescale:     defaultTimescale,
-		Begin:         begin,
-		End:           end,
-		SectionCounts: sectionCounts,
-		StatusCounts:  statusCounts,
-		Traffic:       traffic,
-		Granularity:   defaultGranularity,
+		Timescale:      defaultTimescale,
+		Begin:          begin,
+		End:            end,
+		SectionCounts:  sectionCounts,
+		StatusCounts:   statusCounts,
+		Traffic:        traffic,
+		Granularity:    defaultGranularity,
+		AlertThreshold: *alertThreshold,
+		AlertInterval:  *alertInterval,
+		Alert:          false,
 	}
 	ui.Render(*uiState)
 
@@ -202,9 +176,8 @@ func main() {
 				log.Printf("Error writing log line to database: %v", err)
 			}
 		case <-updateTicker:
-			uiState := nextUIState(uiState, &logTimeSeries)
+			uiState := ui.NextUIState(uiState, &logTimeSeries)
 			ui.Render(*uiState)
-			// Update UI
 		}
 	}
 }

@@ -969,3 +969,153 @@ func TestGetLogLines(t *testing.T) {
 		}()
 	}
 }
+
+func duration(dur string) time.Duration {
+	duration, err := time.ParseDuration(dur)
+	if err != nil {
+		panic(err)
+	}
+	return duration
+}
+
+func TestGetAverageTraffic(t *testing.T) {
+	testCases := []struct {
+		inputRows      []LogLine
+		begin          time.Time
+		end            time.Time
+		expectedOutput float64
+	}{
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:17:00:01 +0000"),
+			3,
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:17:00:00 +0000"),
+			parseTime("09/May/2018:17:00:02 +0000"),
+			1.5,
+		},
+		{
+			[]LogLine{
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/api/user",
+					500,
+					123,
+				},
+				LogLine{
+					"127.0.0.1",
+					"-",
+					"james",
+					parseTime("09/May/2018:17:00:00 +0000"),
+					"GET",
+					"/report",
+					200,
+					123,
+				},
+			},
+			parseTime("09/May/2018:17:00:01 +0000"),
+			parseTime("09/May/2018:17:00:02 +0000"),
+			0,
+		},
+	}
+	for caseIdx, testCase := range testCases {
+		func() {
+			db, err := loadDB()
+			if err != nil {
+				t.Error(err)
+			}
+			defer db.Close()
+			ts := LogTimeSeries{db, logFile}
+			for _, logLine := range testCase.inputRows {
+				ts.Record(logLine)
+			}
+			actual, err := ts.GetAverageTraffic(testCase.begin, testCase.end)
+			if err != nil {
+				t.Error(err)
+			}
+			if actual != testCase.expectedOutput {
+				t.Errorf("Error on test case %d.\nExpected: %v\nActual: %v",
+					caseIdx, testCase.expectedOutput, actual)
+			}
+		}()
+	}
+}

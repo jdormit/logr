@@ -16,12 +16,13 @@ func whichBucket(begin time.Time, end time.Time, numBuckets int, beginBucket int
 	}
 
 	currentBucket := (beginBucket + endBucket) / 2
-	low := (end.Unix() - begin.Unix()) / int64(numBuckets) * int64(currentBucket)
-	high := (end.Unix() - begin.Unix()) / int64(numBuckets) * (int64(currentBucket) + 1)
+	bucketDuration := end.Sub(begin) / time.Duration(numBuckets)
+	low := begin.Add(bucketDuration * time.Duration(currentBucket))
+	high := begin.Add(bucketDuration * time.Duration(currentBucket+1))
 
-	if timestamp.Unix() >= low && timestamp.Unix() < high {
+	if (timestamp.Equal(low) || timestamp.After(low)) && timestamp.Before(high) {
 		return currentBucket
-	} else if timestamp.Unix() < low {
+	} else if timestamp.Before(low) {
 		return whichBucket(begin, end, numBuckets, beginBucket, currentBucket-1, timestamp)
 	} else {
 		return whichBucket(begin, end, numBuckets, currentBucket+1, endBucket, timestamp)

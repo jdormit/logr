@@ -3,22 +3,31 @@ package ui
 import (
 	"fmt"
 	"github.com/gizak/termui"
+	"github.com/jdormit/logr/timebucketer"
 	"github.com/jdormit/logr/timeseries"
+	"log"
 	"time"
 )
+
+const recoveredCountdown = 3
 
 // Traffic is a length-`UIState.Granularity` list of traffic readings,
 // representing the total traffic for each bucket of time in the current time window
 type Traffic []int
 
 type UIState struct {
-	SectionCounts []timeseries.Count
-	StatusCounts  []timeseries.Count
-	Traffic       Traffic
-	Begin         time.Time
-	End           time.Time
-	Timescale     int
-	Granularity   int
+	SectionCounts      []timeseries.Count
+	StatusCounts       []timeseries.Count
+	Traffic            Traffic
+	Begin              time.Time
+	End                time.Time
+	Timescale          int
+	Granularity        int
+	Alert              bool
+	Recovered          bool
+	RecoveredCountdown int
+	AlertThreshold     float64
+	AlertInterval      int
 }
 
 func noData() (noData *termui.Paragraph) {
@@ -122,7 +131,8 @@ func trafficGraph(state UIState) (graph termui.GridBufferer) {
 		labels[i] = bucketTime.Format("15:04:05")
 	}
 	chart.DataLabels = labels
-	chart.BorderLabel = "Site Traffic"
+	chart.BorderLabel = fmt.Sprintf("Site Traffic (Hits per %.2f seconds)",
+		bucketDuration.Seconds())
 	chart.Height = 9
 	chart.PaddingTop = 1
 	chart.TextColor = termui.ColorBlack
@@ -133,8 +143,103 @@ func trafficGraph(state UIState) (graph termui.GridBufferer) {
 	return
 }
 
+func empty() termui.GridBufferer {
+	block := termui.NewBlock()
+	block.Height = 0
+	block.Border = false
+	return block
+}
+
+func alert(state UIState) termui.GridBufferer {
+	if state.Alert {
+		message := fmt.Sprintf("Average traffic exceeded %v/second for over %v seconds!",
+			state.AlertThreshold, state.AlertInterval)
+		alert := termui.NewParagraph(message)
+		alert.BorderFg = termui.ColorRed
+		alert.TextFgColor = termui.ColorRed | termui.AttrBold
+		alert.BorderLabel = "ALERT"
+		alert.Height = 3
+		return alert
+	} else if state.Recovered {
+		message := fmt.Sprintf("Alert recovered at %s",
+			time.Now().Format("15:04:05"))
+		alert := termui.NewParagraph(message)
+		alert.BorderFg = termui.ColorGreen
+		alert.TextFgColor = termui.ColorGreen | termui.AttrBold
+		alert.BorderLabel = "Recovered"
+		alert.Height = 3
+		return alert
+	} else {
+		return empty()
+	}
+}
+
+func currentTime() *termui.Paragraph {
+	currentTime := termui.NewParagraph(fmt.Sprintf("Current time: %s",
+		time.Now().Format("15:04:05")))
+	currentTime.TextFgColor = termui.ColorBlack
+	currentTime.Border = false
+	currentTime.Height = 2
+	return currentTime
+}
+
+func NextUIState(state *UIState, ts *timeseries.LogTimeSeries) *UIState {
+	now := time.Now()
+
+	if state.End.Before(now) {
+		state.Begin = now
+		state.End = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
+	}
+
+	sectionCounts, err := ts.GetSectionCounts(state.Begin, state.End)
+	if err != nil {
+		log.Fatal(err)
+	}
+	state.SectionCounts = sectionCounts
+
+	statusCounts, err := ts.GetStatusCounts(state.Begin, state.End)
+	if err != nil {
+		log.Fatal(err)
+	}
+	state.StatusCounts = statusCounts
+
+	logLines, err := ts.GetLogLines(state.Begin, state.End)
+	if err != nil {
+		log.Fatal(err)
+	}
+	timeBuckets := timebucketer.Bucket(state.Begin, state.End, state.Granularity, logLines)
+	traffic := make([]int, state.Granularity)
+	for i, bucket := range timeBuckets {
+		traffic[i] = len(bucket)
+	}
+	state.Traffic = traffic
+
+	avgTraffic, err := ts.GetAverageTraffic(now.Add(time.Duration(state.AlertInterval)*-time.Second), now)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if state.Recovered {
+		if state.RecoveredCountdown == 0 {
+			state.Recovered = false
+		} else {
+			state.RecoveredCountdown = state.RecoveredCountdown - 1
+		}
+	}
+	if avgTraffic > state.AlertThreshold {
+		state.Alert = true
+	} else if state.Alert {
+		state.Alert = false
+		state.Recovered = true
+		state.RecoveredCountdown = recoveredCountdown
+	}
+
+	return state
+}
+
 func Render(state UIState) {
+	termui.ClearArea(termui.TermRect(), termui.ColorDefault)
 	header := header(state)
+	currentTime := currentTime()
 
 	sectionHeader := sectionHeader()
 	sectionGraph := sectionGraph(state)
@@ -144,17 +249,22 @@ func Render(state UIState) {
 
 	trafficChart := trafficGraph(state)
 
+	alert := alert(state)
+
 	grid := termui.NewGrid()
 	grid.Width = termui.TermWidth()
 	grid.AddRows(
-		termui.NewRow(termui.NewCol(12, 0, header)),
+		termui.NewRow(
+			termui.NewCol(9, 0, header),
+			termui.NewCol(3, 0, currentTime)),
 		termui.NewRow(termui.NewCol(12, 0, trafficChart)),
 		termui.NewRow(
 			termui.NewCol(6, 0, sectionHeader),
 			termui.NewCol(6, 0, statusHeader)),
 		termui.NewRow(
 			termui.NewCol(6, 0, sectionGraph),
-			termui.NewCol(6, 0, statusGraph)))
+			termui.NewCol(6, 0, statusGraph)),
+		termui.NewRow(termui.NewCol(12, 0, alert)))
 	grid.Align()
 	termui.Render(grid)
 }

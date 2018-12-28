@@ -162,3 +162,12 @@ func (ts *LogTimeSeries) GetLogLines(start time.Time, end time.Time) (logLines [
 	}
 	return
 }
+
+// GetAverageTraffic returns the average traffic per second between `start` and `end`.
+func (ts *LogTimeSeries) GetAverageTraffic(start time.Time, end time.Time) (avgTraffic float64, err error) {
+	row := ts.DB.QueryRow("SELECT CAST(count(*) AS FLOAT) / ($1 - $2) FROM loglines "+
+		"WHERE log_file LIKE $3 AND timestamp BETWEEN $4 AND $5",
+		end.Unix(), start.Unix(), ts.LogFile, start.Unix(), end.Unix())
+	err = row.Scan(&avgTraffic)
+	return
+}
