@@ -7,7 +7,6 @@ import (
 	"github.com/gizak/termui"
 	"github.com/jdormit/logr/offsets"
 	"github.com/jdormit/logr/reader"
-	"github.com/jdormit/logr/timebucketer"
 	"github.com/jdormit/logr/timeseries"
 	"github.com/jdormit/logr/ui"
 	_ "github.com/mattn/go-sqlite3"
@@ -67,6 +66,8 @@ func main() {
 
 	alertThreshold := flag.Float64("alertThreshold", defaultAlertThreshold, "The average number of requests per second over the alerting interval that will trigger an alert")
 	alertInterval := flag.Int("alertInterval", defaultAlertInterval, "The interval of time in seconds during which the number of requests per second must exceed the alert threshold to trigger an alert")
+	timescale := flag.Int("timescale", defaultTimescale, "The size of the reporting time window in minutes")
+	granularity := flag.Int("granularity", defaultGranularity, "The granularity of the traffic graph, i.e. the number of buckets into which traffic is divided.")
 
 	flag.Parse()
 
@@ -122,38 +123,12 @@ func main() {
 	}
 	defer termui.Close()
 
-	begin := time.Now()
-	end := begin.Add(time.Duration(defaultTimescale) * time.Minute)
-	sectionCounts, err := logTimeSeries.GetSectionCounts(begin, end)
+	uiState, err := ui.GetInitialUIState(&logTimeSeries, *timescale, *granularity,
+		*alertThreshold, *alertInterval)
 	if err != nil {
 		log.Fatal(err)
 	}
-	statusCounts, err := logTimeSeries.GetStatusCounts(begin, end)
-	if err != nil {
-		log.Fatal(err)
-	}
-	logLines, err := logTimeSeries.GetLogLines(begin, end)
-	if err != nil {
-		log.Fatal(err)
-	}
-	timeBuckets := timebucketer.Bucket(begin, end, defaultGranularity, logLines)
-	traffic := make([]int, defaultGranularity)
-	for i, bucket := range timeBuckets {
-		traffic[i] = len(bucket)
-	}
-	uiState := &ui.UIState{
-		Timescale:      defaultTimescale,
-		Begin:          begin,
-		End:            end,
-		SectionCounts:  sectionCounts,
-		StatusCounts:   statusCounts,
-		Traffic:        traffic,
-		Granularity:    defaultGranularity,
-		AlertThreshold: *alertThreshold,
-		AlertInterval:  *alertInterval,
-		Alert:          false,
-	}
-	ui.Render(*uiState)
+	ui.Render(uiState)
 
 	uiEvents := termui.PollEvents()
 
@@ -168,7 +143,7 @@ func main() {
 				logReader.Terminate()
 				return
 			case "<Resize>":
-				ui.Render(*uiState)
+				ui.Render(uiState)
 			}
 		case logLine := <-logChan:
 			_, err = logTimeSeries.Record(logLine)
@@ -176,8 +151,8 @@ func main() {
 				log.Printf("Error writing log line to database: %v", err)
 			}
 		case <-updateTicker:
-			uiState := ui.NextUIState(uiState, &logTimeSeries)
-			ui.Render(*uiState)
+			uiState := ui.NextUIState(uiState, &logTimeSeries, time.Now())
+			ui.Render(uiState)
 		}
 	}
 }

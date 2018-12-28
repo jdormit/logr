@@ -20,7 +20,6 @@ type UIState struct {
 	StatusCounts       []timeseries.Count
 	Traffic            Traffic
 	Begin              time.Time
-	End                time.Time
 	Timescale          int
 	Granularity        int
 	Alert              bool
@@ -28,6 +27,10 @@ type UIState struct {
 	RecoveredCountdown int
 	AlertThreshold     float64
 	AlertInterval      int
+}
+
+func getEnd(begin time.Time, timescale int) time.Time {
+	return begin.Add(time.Duration(timescale) * time.Minute)
 }
 
 func noData() (noData *termui.Paragraph) {
@@ -38,20 +41,21 @@ func noData() (noData *termui.Paragraph) {
 	return
 }
 
-func header(state UIState) (header *termui.Paragraph) {
+func header(state *UIState) (header *termui.Paragraph) {
+	end := getEnd(state.Begin, state.Timescale)
 	header = termui.NewParagraph(fmt.Sprintf("Traffic Statistics from %s to %s",
-		state.Begin.Format("15:04:05"), state.End.Format("15:04:05")))
+		state.Begin.Format("15:04:05"), end.Format("15:04:05")))
 	header.Height = 3
 	header.TextFgColor = termui.ColorBlack
 	header.Border = false
 	return
 }
 
-func sectionGraph(state UIState) termui.GridBufferer {
+func sectionGraph(state *UIState) termui.GridBufferer {
 	return gaugesWithLabels(state.SectionCounts, "/%s")
 }
 
-func statusGraph(state UIState) termui.GridBufferer {
+func statusGraph(state *UIState) termui.GridBufferer {
 	return gaugesWithLabels(state.StatusCounts, "%v")
 }
 
@@ -115,17 +119,18 @@ func sectionHeader() (header *termui.Paragraph) {
 	return
 }
 
-func summaryStats(state UIState) (stats *termui.Paragraph) {
+func summaryStats(state *UIState) (stats *termui.Paragraph) {
 	statsStr := ""
 	stats = termui.NewParagraph(statsStr)
 	return
 }
 
-func trafficGraph(state UIState) (graph termui.GridBufferer) {
+func trafficGraph(state *UIState) (graph termui.GridBufferer) {
+	end := getEnd(state.Begin, state.Timescale)
 	chart := termui.NewBarChart()
 	chart.Data = state.Traffic
 	labels := make([]string, state.Granularity)
-	bucketDuration := state.End.Sub(state.Begin) / time.Duration(state.Granularity)
+	bucketDuration := end.Sub(state.Begin) / time.Duration(state.Granularity)
 	for i := range labels {
 		bucketTime := state.Begin.Add(bucketDuration * time.Duration(i))
 		labels[i] = bucketTime.Format("15:04:05")
@@ -150,7 +155,7 @@ func empty() termui.GridBufferer {
 	return block
 }
 
-func alert(state UIState) termui.GridBufferer {
+func alert(state *UIState) termui.GridBufferer {
 	if state.Alert {
 		message := fmt.Sprintf("Average traffic exceeded %v/second for over %v seconds!",
 			state.AlertThreshold, state.AlertInterval)
@@ -183,60 +188,7 @@ func currentTime() *termui.Paragraph {
 	return currentTime
 }
 
-func NextUIState(state *UIState, ts *timeseries.LogTimeSeries) *UIState {
-	now := time.Now()
-
-	if state.End.Before(now) {
-		state.Begin = now
-		state.End = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
-	}
-
-	sectionCounts, err := ts.GetSectionCounts(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	state.SectionCounts = sectionCounts
-
-	statusCounts, err := ts.GetStatusCounts(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	state.StatusCounts = statusCounts
-
-	logLines, err := ts.GetLogLines(state.Begin, state.End)
-	if err != nil {
-		log.Fatal(err)
-	}
-	timeBuckets := timebucketer.Bucket(state.Begin, state.End, state.Granularity, logLines)
-	traffic := make([]int, state.Granularity)
-	for i, bucket := range timeBuckets {
-		traffic[i] = len(bucket)
-	}
-	state.Traffic = traffic
-
-	avgTraffic, err := ts.GetAverageTraffic(now.Add(time.Duration(state.AlertInterval)*-time.Second), now)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if state.Recovered {
-		if state.RecoveredCountdown == 0 {
-			state.Recovered = false
-		} else {
-			state.RecoveredCountdown = state.RecoveredCountdown - 1
-		}
-	}
-	if avgTraffic > state.AlertThreshold {
-		state.Alert = true
-	} else if state.Alert {
-		state.Alert = false
-		state.Recovered = true
-		state.RecoveredCountdown = recoveredCountdown
-	}
-
-	return state
-}
-
-func Render(state UIState) {
+func Render(state *UIState) {
 	termui.ClearArea(termui.TermRect(), termui.ColorDefault)
 	header := header(state)
 	currentTime := currentTime()
@@ -267,4 +219,89 @@ func Render(state UIState) {
 		termui.NewRow(termui.NewCol(12, 0, alert)))
 	grid.Align()
 	termui.Render(grid)
+}
+
+func NextUIState(state *UIState, ts *timeseries.LogTimeSeries, now time.Time) *UIState {
+	end := getEnd(state.Begin, state.Timescale)
+	if end.Before(now) {
+		state.Begin = now
+		end = state.Begin.Add(time.Duration(state.Timescale) * time.Minute)
+	}
+
+	sectionCounts, err := ts.GetSectionCounts(state.Begin, end)
+	if err != nil {
+		log.Fatal(err)
+	}
+	state.SectionCounts = sectionCounts
+
+	statusCounts, err := ts.GetStatusCounts(state.Begin, end)
+	if err != nil {
+		log.Fatal(err)
+	}
+	state.StatusCounts = statusCounts
+
+	logLines, err := ts.GetLogLines(state.Begin, end)
+	if err != nil {
+		log.Fatal(err)
+	}
+	timeBuckets := timebucketer.Bucket(state.Begin, end, state.Granularity, logLines)
+	traffic := make([]int, state.Granularity)
+	for i, bucket := range timeBuckets {
+		traffic[i] = len(bucket)
+	}
+	state.Traffic = traffic
+
+	avgTraffic, err := ts.GetAverageTraffic(now.Add(time.Duration(state.AlertInterval)*-time.Second), now)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if state.Recovered {
+		if state.RecoveredCountdown == 0 {
+			state.Recovered = false
+		} else {
+			state.RecoveredCountdown = state.RecoveredCountdown - 1
+		}
+	}
+	if avgTraffic > state.AlertThreshold {
+		state.Alert = true
+	} else if state.Alert {
+		state.Alert = false
+		state.Recovered = true
+		state.RecoveredCountdown = recoveredCountdown
+	}
+
+	return state
+}
+
+func GetInitialUIState(ts *timeseries.LogTimeSeries, timescale int, granularity int, alertThreshold float64, alertInterval int) (state *UIState, err error) {
+	begin := time.Now()
+	end := getEnd(begin, timescale)
+	sectionCounts, err := ts.GetSectionCounts(begin, end)
+	if err != nil {
+		return
+	}
+	statusCounts, err := ts.GetStatusCounts(begin, end)
+	if err != nil {
+		return
+	}
+	logLines, err := ts.GetLogLines(begin, end)
+	if err != nil {
+		return
+	}
+	timeBuckets := timebucketer.Bucket(begin, end, granularity, logLines)
+	traffic := make([]int, granularity)
+	for i, bucket := range timeBuckets {
+		traffic[i] = len(bucket)
+	}
+	state = &UIState{
+		Timescale:      timescale,
+		Begin:          begin,
+		SectionCounts:  sectionCounts,
+		StatusCounts:   statusCounts,
+		Traffic:        traffic,
+		Granularity:    granularity,
+		AlertThreshold: alertThreshold,
+		AlertInterval:  alertInterval,
+	}
+	return
 }
