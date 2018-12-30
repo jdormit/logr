@@ -57,7 +57,7 @@ Logr will then be available as `$GOPATH/bin/logr`:
 			
 Basic usage is simple: `logr /path/to/file.log` will start tailing `file.log` and reporting metrics to a dashboard in the current terminal. 
 
-By default, Logr will display metrics over a 5-minute period, bucketing traffic into 10 30-second slices over the current reorting period. This can be customized with the `-timescale` and `-granularity` options, which set the time period in minutes and the number of buckets respectively.
+By default, Logr will display metrics over a 5-minute period, bucketing traffic into 10 30-second slices over the current reporting period. This can be customized with the `-timescale` and `-granularity` options, which set the time period in minutes and the number of buckets respectively.
 
 An alert will be displayed if the average traffic/second is greater than 10 for the last 2 minutes. These values can be customized with the `-alertThreshold` and `-alertInterval` options, e.g. `-alertThreshold 5 -alertInterval 60` will trigger an alert if the average traffic/second is greater than 5 for over 60 seconds.
 
